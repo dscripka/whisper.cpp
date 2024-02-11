@@ -42,6 +42,12 @@ CFLAGS   = -I.              -O3 -DNDEBUG -std=c11   -fPIC
 CXXFLAGS = -I. -I./examples -O3 -DNDEBUG -std=c++11 -fPIC
 LDFLAGS  =
 
+ifdef MACOSX_DEPLOYMENT_TARGET
+	CFLAGS   += -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)
+	CXXFLAGS += -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)
+	LDFLAGS  += -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)
+endif
+
 # clock_gettime came in POSIX.1b (1993)
 # CLOCK_MONOTONIC came in POSIX.1-2001 / SUSv3 as optional
 # posix_memalign came in POSIX.1-2001 / SUSv3
@@ -209,9 +215,9 @@ endif
 
 ifdef WHISPER_CUBLAS
 	ifeq ($(shell expr $(NVCC_VERSION) \>= 11.6), 1)
-		CUDA_ARCH_FLAG=native
+		CUDA_ARCH_FLAG ?= native
 	else
-		CUDA_ARCH_FLAG=all
+		CUDA_ARCH_FLAG ?= all
 	endif
 
 	CFLAGS      += -DGGML_USE_CUBLAS -I/usr/local/cuda/include -I/opt/cuda/include -I$(CUDA_PATH)/targets/$(UNAME_M)-linux/include
@@ -339,6 +345,24 @@ ggml-metal.o: ggml-metal.m ggml-metal.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 WHISPER_OBJ += ggml-metal.o
+
+ifdef WHISPER_METAL_EMBED_LIBRARY
+CFLAGS += -DGGML_METAL_EMBED_LIBRARY
+
+ggml-metal-embed.o: ggml-metal.metal
+	@echo "Embedding Metal library"
+	$(eval TEMP_ASSEMBLY=$(shell mktemp))
+	@echo ".section __DATA, __ggml_metallib" > $(TEMP_ASSEMBLY)
+	@echo ".globl _ggml_metallib_start" >> $(TEMP_ASSEMBLY)
+	@echo "_ggml_metallib_start:" >> $(TEMP_ASSEMBLY)
+	@echo ".incbin \"$<\"" >> $(TEMP_ASSEMBLY)
+	@echo ".globl _ggml_metallib_end" >> $(TEMP_ASSEMBLY)
+	@echo "_ggml_metallib_end:" >> $(TEMP_ASSEMBLY)
+	@$(AS) $(TEMP_ASSEMBLY) -o $@
+	@rm -f ${TEMP_ASSEMBLY}
+
+WHISPER_OBJ += ggml-metal-embed.o
+endif
 endif
 
 libwhisper.a: $(WHISPER_OBJ)

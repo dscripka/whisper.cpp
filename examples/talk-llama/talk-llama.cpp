@@ -281,7 +281,7 @@ int main(int argc, char ** argv) {
 
     // whisper init
 
-    struct whisper_context_params cparams;
+    struct whisper_context_params cparams = whisper_context_default_params();
     cparams.use_gpu = params.use_gpu;
 
     struct whisper_context * ctx_wsp = whisper_init_from_file_with_params(params.model_wsp.c_str(), cparams);
@@ -719,6 +719,7 @@ int main(int argc, char ** argv) {
                             text_to_speak += llama_token_to_piece(ctx_llama, id);
 
                             printf("%s", llama_token_to_piece(ctx_llama, id).c_str());
+                            fflush(stdout);
                         }
                     }
 
